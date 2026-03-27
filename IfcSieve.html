@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IfcSieve</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Segoe+UI:wght@400;500;600;700&display=swap');
+:root{
+  /* Excel-inspired light palette */
+  --bg:   #f0f0f0;
+  --s1:   #ffffff;
+  --s2:   #f5f5f5;
+  --s3:   #ebebeb;
+  --b1:   #d0d0d0;
+  --b2:   #b8b8b8;
+  --b3:   #a0a0a0;
+  --acc:  #0078d4;
+  --accl: rgba(0,120,212,.08);
+  --accm: rgba(0,120,212,.18);
+  --txt:  #2d2d2d;
+  --th:   #1a1a1a;
+  --td:   #767676;
+  --grn:  #217346;
+  --wrn:  #d83b01;
+  --mono: 'JetBrains Mono',monospace;
+  --sans: 'Segoe UI','DM Sans',sans-serif;
+  --cw:   80px;
+  --sbw:  220px;
+  --fs:   20px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--txt);font-family:var(--sans);font-size:var(--fs);display:flex;flex-direction:column}
+
+/* ── Title bar ── */
+#tb{height:44px;min-height:44px;background:var(--s1);border-bottom:2px solid var(--acc);display:flex;align-items:center;gap:12px;padding:0 16px;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.aname{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--acc);letter-spacing:-.02em;white-space:nowrap}
+.aname em{font-style:normal;color:var(--th)}
+.aver{font-family:var(--mono);font-size:11px;color:var(--td);background:var(--s3);padding:1px 6px;border-radius:3px}
+.tmid{flex:1;font-family:var(--mono);font-size:12px;color:var(--td);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 14px}
+.tmid span{color:var(--acc);font-weight:600}
+.tbbtn{height:28px;padding:0 12px;background:var(--s2);border:1px solid var(--b1);border-radius:3px;color:var(--txt);font-family:var(--sans);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .1s,border-color .1s;white-space:nowrap}
+.tbbtn:hover{background:var(--s3);border-color:var(--b2)}
+.tbbtn svg{flex-shrink:0}
+
+/* ── Layout ── */
+#layout{display:flex;flex:1;overflow:hidden}
+
+/* ── Sidebar ── */
+#sb{width:var(--sbw);min-width:var(--sbw);background:var(--s1);border-right:1px solid var(--b1);display:flex;flex-direction:column;overflow-y:auto}
+.sbs{border-bottom:1px solid var(--b1);padding:10px 0}
+.sbh{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--td);padding:0 14px 6px;font-weight:600}
+
+/* Drop zone */
+#dz{margin:8px 14px 4px;border:2px dashed var(--b1);border-radius:4px;background:var(--s2);padding:16px 10px;text-align:center;transition:border-color .15s,background .15s;cursor:default}
+#dz.over{border-color:var(--acc);background:var(--accl);border-style:solid}
+.dzico{font-size:22px;color:var(--b2);margin-bottom:5px}
+.dztxt{font-size:12px;color:var(--td);line-height:1.9}
+
+/* Browse button */
+#browseBtn{display:block;width:calc(100% - 28px);margin:0 14px 4px;padding:6px 10px;background:var(--acc);border:none;border-radius:3px;color:#fff;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;text-align:center;transition:background .12s}
+#browseBtn:hover{background:#106ebe}
+#fileInput{display:none}
+
+/* File info */
+#fi{display:none;margin:4px 14px 4px;padding:8px 10px;background:var(--s2);border:1px solid var(--b1);border-radius:4px}
+#fi.show{display:block}
+.finm{font-family:var(--mono);font-size:11px;color:var(--th);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:4px}
+.fir{display:flex;justify-content:space-between;font-size:12px;color:var(--td);line-height:2.1}
+.fir .v{color:var(--grn);font-weight:600}
+
+/* Presets */
+.pbtn{display:block;width:calc(100% - 28px);margin:2px 14px;padding:6px 10px;background:var(--s1);border:1px solid var(--b1);border-radius:3px;color:var(--txt);font-family:var(--sans);font-size:13px;cursor:pointer;text-align:left;transition:background .1s,border-color .1s}
+.pbtn:hover{background:var(--accl);border-color:var(--acc);color:var(--acc)}
+
+/* Action buttons */
+.sbact{padding:10px 14px;display:flex;flex-direction:column;gap:7px;margin-top:auto;border-top:1px solid var(--b1);background:var(--s2)}
+.bp{padding:8px 10px;border:none;border-radius:3px;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;width:100%;transition:background .12s}
+.bp.acc{background:var(--acc);color:#fff}.bp.acc:hover{background:#106ebe}
+.bp.acc:disabled{background:var(--b1);color:var(--td);cursor:not-allowed}
+.bp.out{background:var(--s1);color:var(--txt);border:1px solid var(--b1)}
+.bp.out:hover{background:var(--accl);border-color:var(--acc);color:var(--acc)}
+.bp.out:disabled{opacity:.45;cursor:not-allowed}
+.bp.sec{background:transparent;color:var(--td);border:1px solid var(--b1)}
+.bp.sec:hover{background:var(--s3);color:var(--txt)}
+
+/* ── Main panel ── */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+/* Column header */
+#colhdr{height:40px;min-height:40px;background:var(--s2);border-bottom:1px solid var(--b1);display:flex;align-items:center;flex-shrink:0}
+.ccat{flex:1;padding:0 14px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--td);display:flex;align-items:center;gap:10px;font-weight:600}
+.ctog{font-size:12px;color:var(--td);cursor:pointer;padding:3px 10px;border:1px solid var(--b1);border-radius:3px;background:var(--s1);transition:color .12s,border-color .1s;font-family:var(--sans)}
+.ctog:hover{color:var(--acc);border-color:var(--acc)}
+.cdiv{width:1px;background:var(--b1);align-self:stretch;flex-shrink:0}
+.cout{display:flex;align-items:stretch;background:var(--s3)}
+.chfmt{width:var(--cw);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;user-select:none;border-left:1px solid var(--b1);transition:background .1s;padding:4px 0}
+.chfmt:hover{background:var(--accl)}
+.chfmt span{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);font-family:var(--mono);font-weight:600}
+.hck{width:15px;height:15px;border:2px solid var(--b2);border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;transition:all .1s;background:var(--s1)}
+.hck.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.hck.part{background:var(--accm);border-color:var(--acc);color:var(--acc)}
+
+/* Category list */
+#cwrap{flex:1;overflow-y:auto;overflow-x:hidden}
+#empty{display:flex;align-items:center;justify-content:center;height:100%;color:var(--td);font-size:15px;text-align:center;line-height:2.5}
+.crow{border-bottom:1px solid var(--b1);background:var(--s1)}
+.crow:last-child{border-bottom:none}
+.chdr{display:flex;align-items:center;min-height:40px;transition:background .1s}
+.chdr:hover{background:var(--s2)}
+.cchk{width:36px;min-width:36px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+.cb{width:15px;height:15px;border:2px solid var(--b2);border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;transition:all .1s;background:var(--s1)}
+.cb.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.clbl{flex:1;display:flex;align-items:center;gap:10px;padding:0 6px 0 0;overflow:hidden;cursor:pointer;user-select:none}
+.cnm{font-size:14px;font-weight:600;color:var(--th);white-space:nowrap}
+.cct{font-family:var(--mono);font-size:12px;color:var(--td);background:var(--s3);padding:1px 7px;border-radius:10px}
+.cex{font-size:10px;color:var(--td);transition:transform .15s;padding:0 10px;flex-shrink:0}
+.cex.open{transform:rotate(90deg)}
+.rdiv{width:1px;background:var(--b1);align-self:stretch;flex-shrink:0}
+.rfmts{display:flex;align-items:center;background:var(--s2);flex-shrink:0}
+.fcell{width:var(--cw);height:40px;display:flex;align-items:center;justify-content:center;border-left:1px solid var(--b1)}
+.fcell.sup{cursor:pointer}.fcell.sup:hover .fck{border-color:var(--acc)}
+.fck{width:15px;height:15px;border:2px solid var(--b2);border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;transition:all .1s;background:var(--s1)}
+.fck.on{background:var(--accm);border-color:var(--acc);color:var(--acc)}
+.fna{width:15px;height:15px;border:1px solid var(--s3);border-radius:2px;opacity:.3;background:var(--bg)}
+.cbdy{display:none;padding:10px 14px 12px 36px;border-top:1px solid var(--b1);background:var(--bg)}
+.cbdy.open{display:block}
+.cdsc{font-size:12px;color:var(--td);margin-bottom:8px}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.chip{padding:3px 10px;border:1px solid var(--b1);border-radius:12px;background:var(--s1);font-family:var(--mono);font-size:11px;color:var(--td);cursor:pointer;user-select:none;transition:all .1s}
+.chip.on{background:var(--accm);border-color:var(--acc);color:var(--acc);font-weight:600}
+.chip:hover{border-color:var(--acc)}
+
+/* Status bar */
+#statusbar{height:28px;min-height:28px;background:var(--s2);border-top:1px solid var(--b1);display:flex;align-items:center;padding:0 16px;gap:20px;flex-shrink:0}
+.sbi{font-family:var(--mono);font-size:11px;color:var(--td)}
+.sbi span{color:var(--acc);font-weight:600}
+.sbr{margin-left:auto}
+.bzb{padding:3px 14px;background:var(--acc);color:#fff;border:none;border-radius:3px;font-family:var(--sans);font-size:12px;font-weight:600;cursor:pointer}
+.bzb:hover{background:#106ebe}
+.bzb:disabled{background:var(--b1);color:var(--td);cursor:not-allowed}
+
+/* Progress */
+#pw{display:none;padding:8px 14px;background:var(--s1);border-bottom:1px solid var(--b1);flex-shrink:0}
+#pw.show{display:block}
+.pmeta{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;color:var(--td);margin-bottom:5px}
+.pbar{height:3px;background:var(--s3);border-radius:2px}
+.pfill{height:100%;background:var(--acc);width:0;transition:width .15s;border-radius:2px}
+
+/* Outputs panel */
+#rw{display:none;border-top:1px solid var(--b1);background:var(--s1);flex-shrink:0;max-height:200px;overflow-y:auto}
+#rw.show{display:block}
+.rwtop{display:flex;align-items:center;justify-content:space-between;padding:6px 14px;border-bottom:1px solid var(--b1);background:var(--s2)}
+.rwtitle{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--td);font-weight:600}
+.rdla{padding:3px 14px;background:var(--acc);color:#fff;border:none;border-radius:3px;font-family:var(--sans);font-size:12px;font-weight:600;cursor:pointer}
+.rdla:hover{background:#106ebe}
+.rdla:disabled{background:var(--b1);color:var(--td);cursor:not-allowed}
+.rrow{display:flex;align-items:center;border-bottom:1px solid var(--b1);padding:5px 14px;gap:10px;min-height:34px}
+.rrow:last-child{border-bottom:none}
+.rrow:hover{background:var(--s2)}
+.rrgrp{font-family:var(--mono);font-size:11px;color:var(--td);width:90px;flex-shrink:0;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.rrfiles{flex:1;display:flex;flex-wrap:wrap;gap:5px}
+.rfchip{display:flex;align-items:center;gap:6px;background:var(--s2);border:1px solid var(--b1);border-radius:3px;padding:2px 8px;font-family:var(--mono);font-size:11px}
+.rfchip .rfnm{color:var(--acc);font-weight:600}
+.rfchip .rfsz{color:var(--td)}
+.rrdl{padding:3px 12px;background:var(--acc);color:#fff;border:none;border-radius:3px;font-family:var(--sans);font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0}
+.rrdl:hover{background:#106ebe}
+
+/* Error */
+.emsg{display:none;margin:8px 14px;padding:8px 10px;border:1px solid var(--wrn);border-radius:4px;font-size:13px;color:var(--wrn);background:#fff5f0}
+.emsg.show{display:block}
+
+/* ── Properties Modal ── */
+#modalOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:100;align-items:center;justify-content:center}
+#modalOverlay.show{display:flex}
+#modal{background:var(--s1);border:1px solid var(--b1);border-radius:6px;width:480px;max-width:96vw;box-shadow:0 8px 32px rgba(0,0,0,.18);overflow:hidden}
+.mhdr{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:var(--acc);color:#fff}
+.mhdr h2{font-size:15px;font-weight:700;font-family:var(--sans)}
+.mclose{background:none;border:none;color:#fff;font-size:20px;cursor:pointer;line-height:1;padding:0 4px;opacity:.85}
+.mclose:hover{opacity:1}
+.mbody{padding:18px;display:flex;flex-direction:column;gap:18px}
+.msec{display:flex;flex-direction:column;gap:10px}
+.msech{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--td);font-weight:700;padding-bottom:6px;border-bottom:1px solid var(--b1)}
+.mrow{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.mrow label{font-size:14px;color:var(--th);flex:1}
+.mrow .msub{font-size:11px;color:var(--td);margin-top:1px}
+.mlabel-wrap{display:flex;flex-direction:column}
+/* scale slider in modal */
+.mslider-wrap{display:flex;align-items:center;gap:8px}
+.msa{font-family:var(--mono);color:var(--td);user-select:none;line-height:1}
+.msa.sm{font-size:11px}.msa.lg{font-size:18px}
+.mspct{font-family:var(--mono);font-size:12px;color:var(--td);width:36px;text-align:right}
+.msslider{-webkit-appearance:none;appearance:none;width:120px;height:3px;background:var(--b1);border-radius:2px;outline:none;cursor:pointer}
+.msslider::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--acc);cursor:pointer}
+.msslider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--acc);cursor:pointer;border:none}
+/* toggle switch */
+.tog{position:relative;width:44px;height:24px;flex-shrink:0}
+.tog input{opacity:0;width:0;height:0;position:absolute}
+.togsl{position:absolute;inset:0;background:var(--b1);border-radius:12px;cursor:pointer;transition:background .15s}
+.togsl::after{content:'';position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.tog input:checked+.togsl{background:var(--acc)}
+.tog input:checked+.togsl::after{transform:translateX(20px)}
+/* select */
+.msel{padding:5px 10px;border:1px solid var(--b1);border-radius:3px;background:var(--s1);font-family:var(--sans);font-size:13px;color:var(--txt);cursor:pointer;min-width:120px}
+.msel:focus{outline:2px solid var(--acc);outline-offset:1px}
+/* modal footer */
+.mftr{display:flex;justify-content:flex-end;gap:10px;padding:12px 18px;background:var(--s2);border-top:1px solid var(--b1)}
+.mbtn{padding:7px 18px;border-radius:3px;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;border:1px solid var(--b1)}
+.mbtn.pri{background:var(--acc);color:#fff;border-color:var(--acc)}.mbtn.pri:hover{background:#106ebe}
+.mbtn.sec{background:var(--s1);color:var(--txt)}.mbtn.sec:hover{background:var(--s3)}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--s2)}
+::-webkit-scrollbar-thumb{background:var(--b2);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--b3)}
+</style>
+</head>
+<body>
+
+<!-- Title bar -->
+<div id="tb">
+  <div class="aname">Ifc<em>Sieve</em></div>
+  <div class="aver">v0.4</div>
+  <div class="tmid" id="tmid">No file loaded</div>
+  <button class="tbbtn" id="btnProps">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4a4 4 0 100 8A4 4 0 008 4zm0 1.5a2.5 2.5 0 110 5 2.5 2.5 0 010-5z"/><path d="M7.28.54a.75.75 0 011.44 0l.36 1.44c.34.08.67.2.98.36l1.22-.9a.75.75 0 011.06 1.06l-.9 1.22c.16.31.28.64.36.98l1.44.36a.75.75 0 010 1.44l-1.44.36a4.51 4.51 0 01-.36.98l.9 1.22a.75.75 0 01-1.06 1.06l-1.22-.9a4.5 4.5 0 01-.98.36l-.36 1.44a.75.75 0 01-1.44 0l-.36-1.44a4.5 4.5 0 01-.98-.36l-1.22.9a.75.75 0 01-1.06-1.06l.9-1.22a4.51 4.51 0 01-.36-.98L.54 8.72a.75.75 0 010-1.44l1.44-.36c.08-.34.2-.67.36-.98l-.9-1.22A.75.75 0 012.5 3.66l1.22.9c.31-.16.64-.28.98-.36L5.06.54z"/></svg>
+    Properties
+  </button>
+</div>
+
+<!-- Layout -->
+<div id="layout">
+  <div id="sb">
+    <div class="sbs">
+      <div class="sbh">Source</div>
+      <div id="dz"><div class="dzico">&#11041;</div><div class="dztxt">Drop .ifc file here</div></div>
+      <button id="browseBtn">&#11041; Browse for IFC file&hellip;</button>
+      <input type="file" id="fileInput" accept=".ifc">
+      <div id="fi">
+        <div class="finm" id="finm">--</div>
+        <div class="fir"><span>Entities</span><span class="v" id="fient">--</span></div>
+        <div class="fir"><span>Geo stripped</span><span class="v" id="figeo">--</span></div>
+        <div class="fir"><span>Reduction</span><span class="v" id="fired">--</span></div>
+      </div>
+    </div>
+    <div class="sbs">
+      <div class="sbh">Presets</div>
+      <button class="pbtn" data-p="brief">NZ BIM Brief</button>
+      <button class="pbtn" data-p="qs">QS Package</button>
+      <button class="pbtn" data-p="audit">Compliance Audit</button>
+      <button class="pbtn" data-p="full">Full Data Dump</button>
+    </div>
+    <div class="sbact">
+      <button class="bp acc" id="btnX" disabled>&#8595; Extract &amp; Export</button>
+      <button class="bp out" id="btnDlAllSb" disabled>&#8595; Download All</button>
+      <button class="bp sec" id="btnR">New File</button>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="colhdr">
+      <div class="ccat">
+        <div class="hck" id="hck-cats" title="Select / deselect all categories" style="cursor:pointer;flex-shrink:0"></div>
+        <span>Categories</span>
+        <button class="ctog" id="btnCA">Collapse All</button>
+      </div>
+      <div class="cdiv"></div>
+      <div class="cout">
+        <div class="chfmt" id="chfmt-csv" title="Select / deselect all CSV">
+          <div class="hck" id="hck-csv"></div>
+          <span>CSV</span>
+        </div>
+        <div class="chfmt" id="chfmt-json" title="Select / deselect all JSON">
+          <div class="hck" id="hck-json"></div>
+          <span>JSON</span>
+        </div>
+        <div class="chfmt" id="chfmt-markdown" title="Select / deselect all MARKDOWN">
+          <div class="hck" id="hck-markdown"></div>
+          <span>MD</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="pw"><div class="pmeta"><span id="plbl">Processing...</span><span id="ppct">0%</span></div><div class="pbar"><div class="pfill" id="pfill"></div></div></div>
+    <div class="emsg" id="emsg"></div>
+
+    <div id="cwrap">
+      <div id="empty">Drop an IFC file to begin<br><span style="font-size:13px;opacity:.5">Geometry stripped automatically &mdash; all processing local</span></div>
+      <div id="cats"></div>
+    </div>
+
+    <div id="rw">
+      <div class="rwtop">
+        <span class="rwtitle">Outputs</span>
+        <button class="rdla" id="btnDlAll" disabled>&#8595; Download All</button>
+      </div>
+      <div id="rg"></div>
+    </div>
+
+    <div id="statusbar">
+      <div class="sbi" id="stCats">--</div>
+      <div class="sbi" id="stFmts">--</div>
+      <div class="sbr"><button class="bzb" id="btnZB" disabled>&#8595; Download All</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- Properties Modal -->
+<div id="modalOverlay">
+  <div id="modal">
+    <div class="mhdr">
+      <h2>&#9881; Properties</h2>
+      <button class="mclose" id="modalClose">&times;</button>
+    </div>
+    <div class="mbody">
+
+      <div class="msec">
+        <div class="msech">Display</div>
+        <div class="mrow">
+          <div class="mlabel-wrap"><label>Text Scale</label><span class="msub">Adjust for readability</span></div>
+          <div class="mslider-wrap">
+            <span class="msa sm">A</span>
+            <input type="range" id="scl" min="60" max="160" value="100" step="5" class="msslider">
+            <span class="msa lg">A</span>
+            <span class="mspct" id="spct">100%</span>
+          </div>
+        </div>
+        <div class="mrow">
+          <div class="mlabel-wrap"><label>Show entity counts on chips</label><span class="msub">Display count next to each IFC class chip</span></div>
+          <label class="tog"><input type="checkbox" id="optCounts" checked><span class="togsl"></span></label>
+        </div>
+        <div class="mrow">
+          <div class="mlabel-wrap"><label>Expand categories on load</label><span class="msub">Auto-expand all category rows after file loads</span></div>
+          <label class="tog"><input type="checkbox" id="optExpand" checked><span class="togsl"></span></label>
+        </div>
+      </div>
+
+      <div class="msec">
+        <div class="msech">Export</div>
+        <div class="mrow">
+          <div class="mlabel-wrap"><label>Stripped IFC extension</label><span class="msub">.txt avoids Windows security warnings</span></div>
+          <select class="msel" id="optExt">
+            <option value="txt" selected>.txt (recommended)</option>
+            <option value="ifc">.ifc (original)</option>
+          </select>
+        </div>
+        <div class="mrow">
+          <div class="mlabel-wrap"><label>Default format</label><span class="msub">Pre-selected format when a file loads</span></div>
+          <select class="msel" id="optDefFmt">
+            <option value="csv" selected>CSV</option>
+            <option value="json">JSON</option>
+            <option value="markdown">Markdown</option>
+          </select>
+        </div>
+        <div class="mrow">
+          <div class="mlabel-wrap"><label>Download stagger delay</label><span class="msub">Gap between sequential file downloads</span></div>
+          <select class="msel" id="optStagger">
+            <option value="100">100 ms</option>
+            <option value="200" selected>200 ms</option>
+            <option value="400">400 ms</option>
+            <option value="600">600 ms</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="msec">
+        <div class="msech">Processing</div>
+        <div class="mrow">
+          <div class="mlabel-wrap"><label>Strip geometry on load</label><span class="msub">Always strip geometry when a file is opened</span></div>
+          <label class="tog"><input type="checkbox" id="optStrip" checked><span class="togsl"></span></label>
+        </div>
+        <div class="mrow">
+          <div class="mlabel-wrap"><label>Select all categories on load</label><span class="msub">Enable all categories when a new file loads</span></div>
+          <label class="tog"><input type="checkbox" id="optSelAll" checked><span class="togsl"></span></label>
+        </div>
+      </div>
+
+    </div>
+    <div class="mftr">
+      <button class="mbtn sec" id="modalCancel">Cancel</button>
+      <button class="mbtn pri" id="modalOK">Apply</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var GEO = new Set(['IFCLOCALPLACEMENT','IFCGRIDPLACEMENT','IFCAXIS1PLACEMENT','IFCAXIS2PLACEMENT2D','IFCAXIS2PLACEMENT3D','IFCCARTESIANPOINT','IFCCARTESIANPOINTLIST','IFCCARTESIANPOINTLIST2D','IFCCARTESIANPOINTLIST3D','IFCDIRECTION','IFCVECTOR','IFCCARTESIANTRANSFORMATIONOPERATOR2D','IFCCARTESIANTRANSFORMATIONOPERATOR2DNONUNIFORM','IFCCARTESIANTRANSFORMATIONOPERATOR3D','IFCCARTESIANTRANSFORMATIONOPERATOR3DNONUNIFORM','IFCPOLYLINE','IFCLINE','IFCCIRCLE','IFCELLIPSE','IFCTRIMMEDCURVE','IFCOFFSETCURVE2D','IFCOFFSETCURVE3D','IFCCOMPOSITECURVE','IFCCOMPOSITECURVESEGMENT','IFCBSPLINECURVE','IFCBSPLINECURVEWITHKNOTS','IFCRATIONALBSPLINECURVEWITHKNOTS','IFCINDEXEDPOLYCURVE','IFCRECTANGLEPROFILEDEF','IFCRECTANGLEHOLLOWPROFILEDEF','IFCCIRCLEPROFILEDEF','IFCCIRCLEHOLLOWPROFILEDEF','IFCELLIPSEPROFILEDEF','IFCARBITRARYCLOSEDPROFILEDEF','IFCARBITRARYOPENPROFILEDEF','IFCARBITRARYPROFILEDEFWITHVOIDS','IFCISHAPEPROFILEDEF','IFCASYMMETRICISHAPEPROFILEDEF','IFCLSHAPEPROFILEDEF','IFCTSHAPEPROFILEDEF','IFCUSHAPEPROFILEDEF','IFCZSHAPEPROFILEDEF','IFCCSHAPEPROFILEDEF','IFCCOMPOSITEPROFILEDEF','IFCDERIVEDPROFILEDEF','IFCMIRROREDPROFILEDEF','IFCVERTEX','IFCVERTEXPOINT','IFCEDGE','IFCORIENTEDEDGE','IFCSUBEDGE','IFCEDGECURVE','IFCPOLYLOOP','IFCEDGELOOP','IFCVERTEXLOOP','IFCFACE','IFCFACEBOUND','IFCFACEOUTERBOUND','IFCADVANCEDFACE','IFCSHELL','IFCCLOSEDSHELL','IFCOPENSHELL','IFCPLANE','IFCCYLINDRICALSURFACE','IFCBSPLINESURFACE','IFCBSPLINESURFACEWITHKNOTS','IFCRATIONALBSPLINESURFACEWITHKNOTS','IFCEXTRUDEDAREASOLID','IFCEXTRUDEDAREASOLIDTAPERED','IFCREVOLVEDAREASOLID','IFCSWEPTDISKSOLID','IFCMANIFOLDSOLIDBREP','IFCFACETEDBREP','IFCFACETEDBREPWITHVOIDS','IFCADVANCEDBREP','IFCADVANCEDBREPWITHVOIDS','IFCBOOLEANRESULT','IFCBOOLEANCLIPPINGRESULT','IFCHALFSPACESOLID','IFCPOLYGONALBOUNDEDHALFSPACE','IFCCSGSOLID','IFCBLOCK','IFCSPHERE','IFCRECTANGULARPYRAMID','IFCRIGHTCIRCULARCONE','IFCRIGHTCIRCULARCYLINDER','IFCTRIANGULATEDFACESET','IFCPOLYGONALFACESET','IFCINDEXEDPOLYGONALFACE','IFCPOLYGONALFACE','IFCTRIANGULATEDIRREGULARNETWORK','IFCSHAPEREPRESENTATION','IFCSTYLEDREPRESENTATION','IFCTOPOLOGYREPRESENTATION','IFCPRODUCTDEFINITIONSHAPE','IFCSHAPEASPECT','IFCREPRESENTATIONMAP','IFCMAPPEDITEM','IFCGEOMETRICREPRESENTATIONCONTEXT','IFCGEOMETRICREPRESENTATIONSUBCONTEXT','IFCGEOMETRICSET','IFCGEOMETRICCURVESET','IFCSTYLEDITEM','IFCPRESENTATIONSTYLEASSIGNMENT','IFCSURFACESTYLE','IFCSURFACESTYLERENDERING','IFCSURFACESTYLELIGHTING','IFCSURFACESTYLEREFRACTION','IFCCOLOURRGB','IFCFILLAREESTYLE','IFCFILLAREASTYLEHATCHING','IFCCURVESTYLE','IFCTEXTSTYLE','IFCPRESENTATIONLAYERASSIGNMENT','IFCPRESENTATIONLAYERWITHSTYLE']);
+
+var FMTS = ['csv','json','markdown'];
+
+var CATS = [
+  {id:'spatial',   nm:'Spatial Structure',  ds:'Site, Building, Storey, Space, Zone',
+   sf:['csv','json','markdown'],
+   cl:{'IFCPROJECT':'Project','IFCSITE':'Site','IFCBUILDING':'Building','IFCBUILDINGSTOREY':'Storey','IFCSPACE':'Space','IFCZONE':'Zone'},
+   dc:['IFCPROJECT','IFCSITE','IFCBUILDING','IFCBUILDINGSTOREY','IFCSPACE']},
+  {id:'elements',  nm:'Building Elements',  ds:'Walls, Slabs, Beams, Doors, Windows and more',
+   sf:['csv','json','markdown'],
+   cl:{'IFCWALL':'Wall','IFCWALLSTANDARDCASE':'Wall(Std)','IFCSLAB':'Slab','IFCBEAM':'Beam','IFCCOLUMN':'Column','IFCDOOR':'Door','IFCWINDOW':'Window','IFCSTAIR':'Stair','IFCSTAIRFLIGHT':'Stair Flight','IFCRAMP':'Ramp','IFCROOF':'Roof','IFCCURTAINWALL':'Curtain Wall','IFCPLATE':'Plate','IFCMEMBER':'Member','IFCPILE':'Pile','IFCFOOTING':'Footing','IFCBUILDINGELEMENTPROXY':'Proxy','IFCOPENINGELEMENT':'Opening'},
+   dc:['IFCWALL','IFCWALLSTANDARDCASE','IFCSLAB','IFCBEAM','IFCCOLUMN','IFCDOOR','IFCWINDOW']},
+  {id:'properties',nm:'Properties',         ds:'All Pset property sets and values',
+   sf:['csv','json'],
+   cl:{'IFCPROPERTYSET':'Pset','IFCPROPERTYSINGLEVALUE':'Single Value','IFCPROPERTYENUMERATEDVALUE':'Enum Value'},
+   dc:['IFCPROPERTYSET','IFCPROPERTYSINGLEVALUE']},
+  {id:'quantities',nm:'Quantities',         ds:'Qset areas, lengths, volumes, counts',
+   sf:['csv','json'],
+   cl:{'IFCELEMENTQUANTITY':'Element Qty','IFCQUANTITYAREA':'Area','IFCQUANTITYLENGTH':'Length','IFCQUANTITYVOLUME':'Volume','IFCQUANTITYCOUNT':'Count'},
+   dc:['IFCELEMENTQUANTITY','IFCQUANTITYAREA','IFCQUANTITYLENGTH','IFCQUANTITYVOLUME']},
+  {id:'materials', nm:'Materials',          ds:'Material assignments and layer sets',
+   sf:['csv','json'],
+   cl:{'IFCMATERIAL':'Material','IFCMATERIALLAYER':'Layer','IFCMATERIALLAYERSET':'Layer Set','IFCMATERIALLAYERSETUSAGE':'Layer Set Usage'},
+   dc:['IFCMATERIAL','IFCMATERIALLAYERSET']},
+  {id:'classifications',nm:'Classifications',ds:'Uniclass, MasterFormat, custom codes',
+   sf:['csv','json'],
+   cl:{'IFCCLASSIFICATION':'Classification','IFCCLASSIFICATIONREFERENCE':'Ref'},
+   dc:['IFCCLASSIFICATION','IFCCLASSIFICATIONREFERENCE']},
+  {id:'types',     nm:'Types and Families', ds:'Type library - all IfcXxxType objects',
+   sf:['csv','json'],
+   cl:{'IFCWALLTYPE':'Wall Type','IFCSLABTYPE':'Slab Type','IFCDOORTYPE':'Door Type','IFCDOORSTYLE':'Door Style','IFCWINDOWTYPE':'Window Type','IFCWINDOWSTYLE':'Window Style','IFCBEAMTYPE':'Beam Type','IFCCOLUMNTYPE':'Column Type'},
+   dc:['IFCWALLTYPE','IFCSLABTYPE','IFCDOORTYPE','IFCDOORSTYLE','IFCWINDOWTYPE','IFCWINDOWSTYLE']},
+  {id:'schedules', nm:'Schedules (4D/5D)',  ds:'Tasks, work schedules, cost items',
+   sf:['csv','json'],
+   cl:{'IFCTASK':'Task','IFCWORKSCHEDULE':'Work Schedule','IFCCOSTITEM':'Cost Item','IFCCOSTSCHEDULE':'Cost Schedule'},
+   dc:['IFCTASK','IFCWORKSCHEDULE','IFCCOSTITEM','IFCCOSTSCHEDULE']},
+  {id:'metadata',  nm:'Metadata',           ds:'Project info, ownership, application',
+   sf:['csv','json','markdown'],
+   cl:{'IFCPROJECT':'Project','IFCOWNERHISTORY':'Owner History','IFCORGANIZATION':'Organisation','IFCPERSON':'Person','IFCAPPLICATION':'Application'},
+   dc:['IFCPROJECT','IFCOWNERHISTORY','IFCORGANIZATION','IFCPERSON','IFCAPPLICATION']}
+];
+
+var PRESETS = {
+  brief: {en:['spatial','elements','properties','metadata'],        fm:{spatial:['csv','markdown'],elements:['csv'],properties:['csv'],metadata:['markdown']}},
+  qs:    {en:['elements','quantities','materials','classifications'],fm:{elements:['csv'],quantities:['csv'],materials:['csv'],classifications:['csv']}},
+  audit: {en:['spatial','elements','properties','classifications'],  fm:{spatial:['markdown'],elements:['csv'],properties:['csv'],classifications:['csv']}},
+  full:  {en:['spatial','elements','properties','quantities','materials','classifications','types','schedules','metadata'],fm:{}}
+};
+
+// Settings
+var PREFS = {
+  scale:    100,
+  counts:   true,
+  expand:   true,
+  ext:      'txt',
+  defFmt:   'csv',
+  stagger:  200,
+  strip:    true,
+  selAll:   true
+};
+
+var CS = {};
+function initCS() {
+  CATS.forEach(function(c) {
+    CS[c.id] = {on:true, fmts:new Set([PREFS.defFmt in {csv:1,json:1,markdown:1} && c.sf.indexOf(PREFS.defFmt)>=0 ? PREFS.defFmt : c.sf[0]]), cls:new Set(c.dc), open:PREFS.expand};
+  });
+}
+initCS();
+
+// ── PARSING ───────────────────────────────────────────────────────────────────
+function splitA(s) {
+  var p=[],d=0,inS=false,cur='',i,c;
+  for(i=0;i<s.length;i++){
+    c=s[i];
+    if(c==="'"&&!inS){inS=true;cur+=c;}
+    else if(c==="'"&&inS){cur+=c;if(s[i+1]==="'"){cur+=s[++i];}else{inS=false;}}
+    else if(inS){cur+=c;}
+    else if(c==='('){d++;cur+=c;}
+    else if(c===')'){d--;cur+=c;}
+    else if(c===','&&d===0){p.push(cur);cur='';}
+    else{cur+=c;}
+  }
+  if(cur.length){p.push(cur);}
+  return p;
+}
+function uq(s){if(!s||s==='$'||s==='*'){return null;}var m=s.match(/^'(.*)'$/s);return m?m[1].replace(/''/g,"'"):s;}
+function ri(s){if(!s){return null;}var m=s.match(/^#(\d+)$/);return m?parseInt(m[1]):null;}
+function rs(s){if(!s){return[];}var r=[],rx=/#(\d+)/g,m;while((m=rx.exec(s))!==null){r.push(parseInt(m[1]));}return r;}
+
+function buildEM(text) {
+  var map=new Map();
+  var rx=/^#(\d+)\s*=\s*([A-Z][A-Z0-9]*)\s*\((.*)\)\s*;?\s*$/s;
+  var lines=text.split('\n'),cur='',i,t,mx;
+  function flush(){mx=cur.match(rx);if(mx){map.set(parseInt(mx[1]),{type:mx[2],attrs:splitA(mx[3])});}}
+  for(i=0;i<lines.length;i++){
+    t=lines[i].trim();
+    if(!t){continue;}
+    if(t.charAt(0)==='#'){if(cur){flush();}cur=t;}
+    else if(cur){cur+=' '+t;}
+  }
+  if(cur){flush();}
+  return map;
+}
+
+function stripGeo(text) {
+  text=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  var dm=/\nDATA;\n/.exec(text);
+  if(!dm){throw new Error('No DATA section found - valid IFC SPF file?');}
+  var ds=dm.index+dm[0].length,es=text.indexOf('\nENDSEC;',ds);
+  if(es===-1){throw new Error('ENDSEC not found.');}
+  var before=text.substring(0,ds),data=text.substring(ds,es),after=text.substring(es);
+  var lines=data.split('\n'),el=[],cur='',i,t,j,m;
+  for(i=0;i<lines.length;i++){
+    t=lines[i].trim();
+    if(!t){continue;}
+    if(t.charAt(0)==='#'){if(cur){el.push(cur);}cur=t;}
+    else if(cur){cur+=' '+t;}
+  }
+  if(cur){el.push(cur);}
+  var raw=new Map(),trx=/^#(\d+)\s*=\s*([A-Z][A-Z0-9]*)\s*\(/;
+  for(j=0;j<el.length;j++){m=el[j].match(trx);if(m){raw.set(parseInt(m[1]),{type:m[2],line:el[j]});}}
+  var gids=new Set();
+  raw.forEach(function(v,id){if(GEO.has(v.type)){gids.add(id);}});
+  var rrx=/#(\d+)/g,parts=[before],kept=0;
+  raw.forEach(function(v){
+    if(GEO.has(v.type)){return;}
+    kept++;
+    parts.push(v.line.replace(rrx,function(mx,n){return gids.has(parseInt(n))?'$':mx;})+'\n');
+  });
+  parts.push(after);
+  return {text:parts.join(''),total:raw.size,kept:kept,stripped:gids.size};
+}
+
+// ── ANALYSIS ──────────────────────────────────────────────────────────────────
+function mkContain(em){var m=new Map();em.forEach(function(e){if(e.type!=='IFCRELCONTAINEDINSPATIALSTRUCTURE'){return;}var elems=rs(e.attrs[4]),sid=ri(e.attrs[5]),se=sid?em.get(sid):null,sn=se?(uq(se.attrs[2])||se.type):'?';elems.forEach(function(id){m.set(id,sn);});});return m;}
+function mkTree(em){var ch=new Map(),rid=null;em.forEach(function(e,id){if(e.type==='IFCPROJECT'){rid=id;}if(e.type!=='IFCRELAGGREGATES'){return;}var p=ri(e.attrs[4]),kids=rs(e.attrs[5]);if(p!==null){if(!ch.has(p)){ch.set(p,[]);}ch.get(p).push.apply(ch.get(p),kids);}});return {root:rid,ch:ch};}
+function mkProps(em){var m=new Map();em.forEach(function(e){if(e.type!=='IFCRELDEFINESBYPROPERTIES'){return;}var elems=rs(e.attrs[4]),pdi=ri(e.attrs[5]);if(!pdi){return;}var pd=em.get(pdi);if(!pd||pd.type!=='IFCPROPERTYSET'){return;}var pn=uq(pd.attrs[2])||'?',props=[];rs(pd.attrs[4]).forEach(function(pid){var pr=em.get(pid);if(!pr){return;}var name=uq(pr.attrs[0])||'?',val='?';if(pr.type==='IFCPROPERTYSINGLEVALUE'&&pr.attrs[2]&&pr.attrs[2]!=='$'){var v=pr.attrs[2],vm=v.match(/^[A-Z]+\((.+)\)$/);val=vm?(uq(vm[1])||vm[1]):uq(v)||v;}props.push({pn:pn,name:name,val:val});});elems.forEach(function(id){if(!m.has(id)){m.set(id,[]);}m.get(id).push.apply(m.get(id),props);});});return m;}
+function mkQtys(em){var m=new Map();em.forEach(function(e){if(e.type!=='IFCRELDEFINESBYPROPERTIES'){return;}var elems=rs(e.attrs[4]),pdi=ri(e.attrs[5]);if(!pdi){return;}var pd=em.get(pdi);if(!pd||pd.type!=='IFCELEMENTQUANTITY'){return;}var qn=uq(pd.attrs[2])||'?',qtys=[];rs(pd.attrs[5]).forEach(function(qid){var q=em.get(qid);if(!q){return;}qtys.push({qn:qn,name:uq(q.attrs[0])||'?',val:q.attrs[3]?(uq(q.attrs[3])||q.attrs[3]):'?'});});elems.forEach(function(id){if(!m.has(id)){m.set(id,[]);}m.get(id).push.apply(m.get(id),qtys);});});return m;}
+function mkMats(em){var m=new Map();em.forEach(function(e){if(e.type!=='IFCRELASSOCIATESMATERIAL'){return;}var elems=rs(e.attrs[4]),mi=ri(e.attrs[5]);if(!mi){return;}var mat=em.get(mi);if(!mat){return;}var mn='?';if(mat.type==='IFCMATERIAL'){mn=uq(mat.attrs[0])||'?';}else if(mat.type==='IFCMATERIALLAYERSET'){mn=uq(mat.attrs[1])||'Layer Set';}else{mn=mat.type;}elems.forEach(function(id){m.set(id,mn);});});return m;}
+function mkClass(em){var m=new Map();em.forEach(function(e){if(e.type!=='IFCRELASSOCIATESCLASSIFICATION'){return;}var elems=rs(e.attrs[4]),ci=ri(e.attrs[5]);if(!ci){return;}var cr=em.get(ci);if(!cr){return;}var code='?',cname='?',sys='?';if(cr.type==='IFCCLASSIFICATIONREFERENCE'){code=uq(cr.attrs[1])||'?';cname=uq(cr.attrs[2])||'?';var srcId=ri(cr.attrs[3])||ri(cr.attrs[0]),src=srcId?em.get(srcId):null;if(src&&src.type==='IFCCLASSIFICATION'){sys=uq(src.attrs[3])||uq(src.attrs[1])||'?';}}elems.forEach(function(id){if(!m.has(id)){m.set(id,[]);}m.get(id).push({sys:sys,code:code,name:cname});});});return m;}
+
+// ── EXPORTERS ─────────────────────────────────────────────────────────────────
+function csvRow(fields){return fields.map(function(v){if(v==null){return'';}var s=String(v);return(s.indexOf(',')>=0||s.indexOf('"')>=0||s.indexOf('\n')>=0)?'"'+s.replace(/"/g,'""')+'"':s;}).join(',');}
+function expSpatialMD(em){var t=mkTree(em),lines=[];if(t.root===null){return'# Spatial Structure\n\nNo project found.\n';}function walk(id,d){var e=em.get(id);if(!e){return;}var h='######'.substring(0,Math.min(d+1,6));lines.push(h+' '+(uq(e.attrs[2])||'?'));lines.push('_'+e.type+'_\n');(t.ch.get(id)||[]).forEach(function(k){walk(k,d+1);});}walk(t.root,0);return lines.join('\n');}
+function expSpatialCSV(em){var t=mkTree(em),rows=[csvRow(['GUID','Type','Name','Description','Parent'])];function walk(id,pn){var e=em.get(id);if(!e){return;}rows.push(csvRow([uq(e.attrs[0]),e.type,uq(e.attrs[2]),uq(e.attrs[3]),pn]));var nm=uq(e.attrs[2])||'?';(t.ch.get(id)||[]).forEach(function(k){walk(k,nm);});}if(t.root!==null){walk(t.root,'');}return rows.join('\n');}
+function expElemCSV(em,cls){var ts=new Set(cls.map(function(c){return c.toUpperCase();})),cont=mkContain(em),rows=[csvRow(['GUID','Type','Name','Description','Tag','Level'])];em.forEach(function(e,id){if(!ts.has(e.type)){return;}rows.push(csvRow([uq(e.attrs[0]),e.type,uq(e.attrs[2]),uq(e.attrs[3]),uq(e.attrs[7]),cont.get(id)||'?']));});return rows.join('\n');}
+function expElemMD(em,cls){var ts=new Set(cls.map(function(c){return c.toUpperCase();})),cont=mkContain(em),byLvl={};em.forEach(function(e,id){if(!ts.has(e.type)){return;}var lvl=cont.get(id)||'Unassigned';if(!byLvl[lvl]){byLvl[lvl]=[];}byLvl[lvl].push(e);});var lines=['# Building Elements\n'];Object.keys(byLvl).forEach(function(lvl){lines.push('## '+lvl+'\n','| Type | Name | GUID |','|---|---|---|');byLvl[lvl].forEach(function(e){lines.push('| '+e.type+' | '+(uq(e.attrs[2])||'?')+' | `'+(uq(e.attrs[0])||'?')+'` |');});lines.push('');});return lines.join('\n');}
+function expPropsCSV(em){var pm=mkProps(em),cont=mkContain(em),rows=[csvRow(['ElementGUID','ElementType','ElementName','Level','PsetName','PropertyName','Value'])];pm.forEach(function(props,eid){var e=em.get(eid);if(!e){return;}var g=uq(e.attrs[0]),nm=uq(e.attrs[2])||'?',lv=cont.get(eid)||'?';props.forEach(function(p){rows.push(csvRow([g,e.type,nm,lv,p.pn,p.name,p.val]));});});return rows.join('\n');}
+function expQtysCSV(em){var qm=mkQtys(em),cont=mkContain(em),rows=[csvRow(['ElementGUID','ElementType','ElementName','Level','QsetName','QuantityName','Value'])];qm.forEach(function(qtys,eid){var e=em.get(eid);if(!e){return;}var g=uq(e.attrs[0]),nm=uq(e.attrs[2])||'?',lv=cont.get(eid)||'?';qtys.forEach(function(q){rows.push(csvRow([g,e.type,nm,lv,q.qn,q.name,q.val]));});});return rows.join('\n');}
+function expMatsCSV(em){var mm=mkMats(em),cont=mkContain(em),rows=[csvRow(['ElementGUID','ElementType','ElementName','Level','Material'])];mm.forEach(function(mn,eid){var e=em.get(eid);if(!e){return;}rows.push(csvRow([uq(e.attrs[0]),e.type,uq(e.attrs[2])||'?',cont.get(eid)||'?',mn]));});return rows.join('\n');}
+function expClassCSV(em){var cm=mkClass(em),cont=mkContain(em),rows=[csvRow(['ElementGUID','ElementType','ElementName','Level','System','Code','ClassName'])];cm.forEach(function(list,eid){var e=em.get(eid);if(!e){return;}var g=uq(e.attrs[0]),nm=uq(e.attrs[2])||'?',lv=cont.get(eid)||'?';list.forEach(function(c){rows.push(csvRow([g,e.type,nm,lv,c.sys,c.code,c.name]));});});return rows.join('\n');}
+function expTypesCSV(em,cls){var ts=new Set(cls.map(function(c){return c.toUpperCase();})),rows=[csvRow(['GUID','Type','Name','Description'])];em.forEach(function(e){if(!ts.has(e.type)){return;}rows.push(csvRow([uq(e.attrs[0]),e.type,uq(e.attrs[2]),uq(e.attrs[3])]));});return rows.join('\n');}
+function expSchedCSV(em,cls){var ts=new Set(cls.map(function(c){return c.toUpperCase();})),rows=[csvRow(['GUID','Type','Name','Description'])];em.forEach(function(e){if(!ts.has(e.type)){return;}rows.push(csvRow([uq(e.attrs[0]),e.type,uq(e.attrs[2]),uq(e.attrs[3])]));});return rows.join('\n');}
+function expMetaMD(em){var lines=['# Project Metadata\n'];em.forEach(function(e){if(e.type!=='IFCPROJECT'){return;}lines.push('## '+(uq(e.attrs[2])||'Unnamed')+'\n| | |\n|---|---|\n| GUID | `'+(uq(e.attrs[0])||'?')+'` |\n');});lines.push('## Authoring\n');em.forEach(function(e){if(e.type!=='IFCOWNERHISTORY'){return;}var pu=em.get(ri(e.attrs[0])),pa=em.get(ri(e.attrs[1]));if(pu){var per=em.get(ri(pu.attrs[0])),org=em.get(ri(pu.attrs[1]));if(per){var fn=uq(per.attrs[2])||'',ln=uq(per.attrs[1])||'';if(fn||ln){lines.push('- **Person:** '+fn+' '+ln);}}if(org){lines.push('- **Organisation:** '+(uq(org.attrs[1])||uq(org.attrs[0])||'?'));}}if(pa){lines.push('- **Application:** '+(uq(pa.attrs[2])||'?')+' v'+(uq(pa.attrs[1])||'?'));}});return lines.join('\n');}
+function expJSON(em,types){var s=new Set(types.map(function(tp){return tp.toUpperCase();})),o={};em.forEach(function(e,id){if(s.has(e.type)){o[id]={type:e.type,attrs:e.attrs};}});return JSON.stringify(o,null,2);}
+
+function genOutputs(em,fn) {
+  var ext=PREFS.ext||'txt';
+  var outs=[{fn:fn+'_data.'+ext,content:strippedText,mt:'text/plain',grp:'stripped'}];
+  CATS.forEach(function(cat) {
+    var st=CS[cat.id];if(!st.on||st.fmts.size===0){return;}
+    var cls=Array.from(st.cls);
+    st.fmts.forEach(function(fmt) {
+      var content='';
+      try{
+        if(fmt==='csv'){if(cat.id==='spatial'){content=expSpatialCSV(em);}else if(cat.id==='elements'){content=expElemCSV(em,cls);}else if(cat.id==='properties'){content=expPropsCSV(em);}else if(cat.id==='quantities'){content=expQtysCSV(em);}else if(cat.id==='materials'){content=expMatsCSV(em);}else if(cat.id==='classifications'){content=expClassCSV(em);}else if(cat.id==='types'){content=expTypesCSV(em,cls);}else if(cat.id==='schedules'){content=expSchedCSV(em,cls);}else{content=expJSON(em,Object.keys(cat.cl));}}
+        else if(fmt==='markdown'){if(cat.id==='spatial'){content=expSpatialMD(em);}else if(cat.id==='elements'){content=expElemMD(em,cls);}else if(cat.id==='metadata'){content=expMetaMD(em);}else{content='# '+cat.nm+'\n\nMarkdown not available for this category.\n';}}
+        else{content=expJSON(em,Object.keys(cat.cl));}
+      }catch(err){content='Error: '+err.message;}
+      var x=fmt==='markdown'?'md':fmt;
+      var mt=fmt==='csv'?'text/csv':fmt==='markdown'?'text/markdown':'application/json';
+      outs.push({fn:fn+'_'+cat.id+'.'+x,content:content,mt:mt,grp:cat.id});
+    });
+  });
+  return outs;
+}
+
+// ── STATE & HELPERS ───────────────────────────────────────────────────────────
+var entityMap=null,strippedText=null,baseFn='';
+function setP(l,p){document.getElementById('plbl').textContent=l;document.getElementById('ppct').textContent=p+'%';document.getElementById('pfill').style.width=p+'%';}
+function showErr(msg){var el=document.getElementById('emsg');el.textContent='Warning: '+msg;el.classList.add('show');document.getElementById('pw').classList.remove('show');}
+function fmtB(b){return b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB';}
+function fmtN(n){return n.toLocaleString('en-NZ');}
+
+function applyScale(v) {
+  document.getElementById('layout').style.fontSize=v+'%';
+  document.getElementById('spct').textContent=v+'%';
+  document.getElementById('scl').value=v;
+}
+
+function updStatus() {
+  var on=CATS.filter(function(c){return CS[c.id].on;});
+  var ft={csv:0,json:0,markdown:0};
+  on.forEach(function(c){CS[c.id].fmts.forEach(function(f){if(ft[f]!==undefined){ft[f]++;}});});
+  document.getElementById('stCats').innerHTML='<span>'+on.length+'</span> categor'+(on.length===1?'y':'ies')+' selected';
+  var fp=Object.keys(ft).filter(function(k){return ft[k]>0;}).map(function(k){return'<span>'+ft[k]+'</span> '+k.toUpperCase();}).join(' / ');
+  document.getElementById('stFmts').innerHTML=fp||'--';
+}
+function updCB(){document.getElementById('btnCA').textContent=CATS.some(function(c){return CS[c.id].open;})?'Collapse All':'Expand All';}
+
+function updColHdrs() {
+  FMTS.forEach(function(fmt) {
+    var hck=document.getElementById('hck-'+fmt);if(!hck){return;}
+    var total=0,ticked=0;
+    CATS.forEach(function(cat){if(cat.sf.indexOf(fmt)<0){return;}total++;if(CS[cat.id].fmts.has(fmt)){ticked++;}});
+    if(ticked===0){hck.className='hck';hck.textContent='';}
+    else if(ticked===total){hck.className='hck on';hck.textContent='v';}
+    else{hck.className='hck part';hck.textContent='-';}
+  });
+}
+
+function updCatHdr() {
+  var hck=document.getElementById('hck-cats');if(!hck){return;}
+  var on=CATS.filter(function(c){return CS[c.id].on;}).length;
+  if(on===0){hck.className='hck';hck.textContent='';}
+  else if(on===CATS.length){hck.className='hck on';hck.textContent='v';}
+  else{hck.className='hck part';hck.textContent='-';}
+}
+
+// Column header click handlers
+FMTS.forEach(function(fmt) {
+  var hdr=document.getElementById('chfmt-'+fmt);if(!hdr){return;}
+  hdr.addEventListener('click',function() {
+    var total=0,ticked=0;
+    CATS.forEach(function(cat){if(cat.sf.indexOf(fmt)<0){return;}total++;if(CS[cat.id].fmts.has(fmt)){ticked++;}});
+    var turnOn=(ticked<total);
+    CATS.forEach(function(cat) {
+      if(cat.sf.indexOf(fmt)<0){return;}
+      if(turnOn){CS[cat.id].fmts.add(fmt);}else{CS[cat.id].fmts.delete(fmt);}
+    });
+    document.querySelectorAll('.fcell[data-fmt="'+fmt+'"]').forEach(function(cell) {
+      var catId=cell.dataset.cat;if(!catId){return;}
+      var fck=cell.querySelector('.fck');if(!fck){return;}
+      var isOn=CS[catId].fmts.has(fmt);fck.className='fck'+(isOn?' on':'');fck.textContent=isOn?'v':'';
+    });
+    updColHdrs();updStatus();
+  });
+});
+
+// Categories master checkbox
+document.getElementById('hck-cats').addEventListener('click',function() {
+  var on=CATS.filter(function(c){return CS[c.id].on;}).length;
+  var turnOn=(on<CATS.length);
+  CATS.forEach(function(cat){CS[cat.id].on=turnOn;});
+  document.querySelectorAll('.cchk').forEach(function(chkW,i) {
+    var cbEl=chkW.querySelector('.cb');if(!cbEl){return;}
+    var cat=CATS[i];if(!cat){return;}
+    cbEl.className='cb'+(CS[cat.id].on?' on':'');cbEl.textContent=CS[cat.id].on?'v':'';
+  });
+  updCatHdr();updStatus();
+});
+
+// ── RENDER CATEGORIES ─────────────────────────────────────────────────────────
+function renderCats(em) {
+  var tc=new Map();em.forEach(function(e){tc.set(e.type,(tc.get(e.type)||0)+1);});
+  var panel=document.getElementById('cats');panel.innerHTML='';
+  CATS.forEach(function(cat) {
+    var st=CS[cat.id];
+    var cnt=0;Object.keys(cat.cl).forEach(function(c){cnt+=tc.get(c)||0;});
+    var row=document.createElement('div');row.className='crow';
+    var hdr=document.createElement('div');hdr.className='chdr';
+    var chkW=document.createElement('div');chkW.className='cchk';
+    var cbEl=document.createElement('div');cbEl.className='cb'+(st.on?' on':'');cbEl.textContent=st.on?'v':'';
+    chkW.appendChild(cbEl);
+    chkW.addEventListener('click',function(e){e.stopPropagation();st.on=!st.on;cbEl.className='cb'+(st.on?' on':'');cbEl.textContent=st.on?'v':'';updCatHdr();updStatus();});
+    var lblEl=document.createElement('div');lblEl.className='clbl';
+    var exEl=document.createElement('div');exEl.className='cex'+(st.open?' open':'');exEl.textContent='>';
+    var cntEl=document.createElement('div');cntEl.className='cct';cntEl.textContent=cnt>0?fmtN(cnt):'--';
+    lblEl.innerHTML='<div class="cnm">'+cat.nm+'</div>';
+    lblEl.appendChild(cntEl);lblEl.appendChild(exEl);
+    var bodyEl=document.createElement('div');bodyEl.className='cbdy'+(st.open?' open':'');
+    lblEl.addEventListener('click',function(e){e.stopPropagation();st.open=!st.open;exEl.classList.toggle('open',st.open);bodyEl.classList.toggle('open',st.open);updCB();});
+    var divEl=document.createElement('div');divEl.className='rdiv';
+    var fmtsEl=document.createElement('div');fmtsEl.className='rfmts';
+    FMTS.forEach(function(fmt) {
+      var cell=document.createElement('div');
+      var sup=cat.sf.indexOf(fmt)>=0;
+      cell.className='fcell'+(sup?' sup':'');cell.dataset.fmt=fmt;cell.dataset.cat=cat.id;
+      if(sup){
+        var fck=document.createElement('div');fck.className='fck'+(st.fmts.has(fmt)?' on':'');fck.textContent=st.fmts.has(fmt)?'v':'';
+        cell.appendChild(fck);
+        cell.addEventListener('click',function(e){e.stopPropagation();if(st.fmts.has(fmt)){st.fmts.delete(fmt);fck.className='fck';fck.textContent='';}else{st.fmts.add(fmt);fck.className='fck on';fck.textContent='v';}updColHdrs();updStatus();});
+      }else{var fna=document.createElement('div');fna.className='fna';cell.appendChild(fna);}
+      fmtsEl.appendChild(cell);
+    });
+    hdr.appendChild(chkW);hdr.appendChild(lblEl);hdr.appendChild(divEl);hdr.appendChild(fmtsEl);
+    var dscEl=document.createElement('div');dscEl.className='cdsc';dscEl.textContent=cat.ds;bodyEl.appendChild(dscEl);
+    var chipsEl=document.createElement('div');chipsEl.className='chips';
+    Object.keys(cat.cl).forEach(function(cls) {
+      var lbl=cat.cl[cls],isOn=st.cls.has(cls),n=tc.get(cls)||0;
+      var chip=document.createElement('div');chip.className='chip'+(isOn?' on':'');
+      chip.textContent=lbl+(PREFS.counts&&n>0?' '+fmtN(n):'');
+      chip.addEventListener('click',function(){if(st.cls.has(cls)){st.cls.delete(cls);chip.classList.remove('on');}else{st.cls.add(cls);chip.classList.add('on');}});
+      chipsEl.appendChild(chip);
+    });
+    bodyEl.appendChild(chipsEl);row.appendChild(hdr);row.appendChild(bodyEl);panel.appendChild(row);
+  });
+  updStatus();updCB();updColHdrs();updCatHdr();
+}
+
+// ── FILE PROCESSING ───────────────────────────────────────────────────────────
+function processFile(file) {
+  if(!file){return;}
+  if(!file.name.toLowerCase().endsWith('.ifc')){showErr('Not an IFC file: '+file.name);return;}
+  document.getElementById('emsg').classList.remove('show');
+  document.getElementById('pw').classList.add('show');
+  document.getElementById('rw').classList.remove('show');
+  document.getElementById('empty').style.display='none';
+  document.getElementById('cats').innerHTML='';
+  setP('Reading file...',5);
+  var reader=new FileReader();
+  reader.onload=function(ev) {
+    var text=ev.target.result,origSz=new Blob([text]).size;
+    setTimeout(function() {
+      try{
+        setP('Stripping geometry...',20);
+        var sg=PREFS.strip?stripGeo(text):{text:text,total:0,kept:0,stripped:0};
+        strippedText=sg.text;
+        setP('Parsing entities...',55);
+        entityMap=buildEM(sg.text);
+        baseFn=file.name.replace(/\.ifc$/i,'');
+        var newSz=new Blob([sg.text]).size;
+        document.getElementById('finm').textContent=file.name;
+        document.getElementById('fient').textContent=fmtN(sg.total);
+        document.getElementById('figeo').textContent=fmtN(sg.stripped);
+        document.getElementById('fired').textContent=Math.round((1-newSz/origSz)*100)+'%';
+        document.getElementById('fi').classList.add('show');
+        document.getElementById('dz').style.display='none';
+        document.getElementById('browseBtn').style.display='none';
+        var short=file.name.length>36?file.name.slice(0,33)+'...':file.name;
+        document.getElementById('tmid').innerHTML=short+' &mdash; <span>'+fmtN(sg.kept)+'</span> data entities';
+        setP('Indexing...',78);
+        if(PREFS.selAll){initCS();}
+        renderCats(entityMap);
+        document.getElementById('btnX').disabled=false;
+        document.getElementById('pw').classList.remove('show');
+      }catch(err){showErr(err.message);}
+    },60);
+  };
+  reader.onerror=function(){showErr('Could not read file.');};
+  reader.readAsText(file);
+}
+
+// ── ACTIONS ───────────────────────────────────────────────────────────────────
+document.getElementById('btnCA').addEventListener('click',function() {
+  var t=!CATS.some(function(c){return CS[c.id].open;});
+  CATS.forEach(function(c){CS[c.id].open=t;});
+  document.querySelectorAll('.cbdy').forEach(function(b){b.classList.toggle('open',t);});
+  document.querySelectorAll('.cex').forEach(function(e){e.classList.toggle('open',t);});
+  updCB();
+});
+
+function doExtract() {
+  if(!entityMap){return;}
+  document.getElementById('pw').classList.add('show');document.getElementById('rw').classList.remove('show');setP('Generating...',15);
+  setTimeout(function() {
+    try{
+      var outs=genOutputs(entityMap,baseFn);window._outs=outs;setP('Ready',95);
+      var grid=document.getElementById('rg');grid.innerHTML='';
+      var groups={},order=[];
+      outs.forEach(function(o){var g=o.grp||'other';if(!groups[g]){groups[g]=[];order.push(g);}groups[g].push(o);});
+      order.forEach(function(grp) {
+        var files=groups[grp],row=document.createElement('div');row.className='rrow';
+        var lbl=document.createElement('div');lbl.className='rrgrp';lbl.textContent=grp;row.appendChild(lbl);
+        var fc=document.createElement('div');fc.className='rrfiles';
+        files.forEach(function(o){var sz=new Blob([o.content]).size,chip=document.createElement('div');chip.className='rfchip';var nm=document.createElement('span');nm.className='rfnm';nm.textContent=o.fn.replace(baseFn+'_','').replace(baseFn,'data');var szEl=document.createElement('span');szEl.className='rfsz';szEl.textContent=fmtB(sz);chip.appendChild(nm);chip.appendChild(szEl);fc.appendChild(chip);});
+        row.appendChild(fc);
+        var btn=document.createElement('button');btn.className='rrdl';btn.textContent='Download';
+        btn.addEventListener('click',function(){files.forEach(function(o,i){setTimeout(function(){dlFile(o);},i*PREFS.stagger);});});
+        row.appendChild(btn);grid.appendChild(row);
+      });
+      document.getElementById('pw').classList.remove('show');document.getElementById('rw').classList.add('show');
+      document.getElementById('btnDlAllSb').disabled=false;document.getElementById('btnDlAll').disabled=false;document.getElementById('btnZB').disabled=false;
+    }catch(err){showErr('Export failed: '+err.message);}
+  },60);
+}
+
+function dlFile(o){var url=URL.createObjectURL(new Blob([o.content],{type:o.mt}));var a=document.createElement('a');a.href=url;a.download=o.fn;a.click();URL.revokeObjectURL(url);}
+function dlAll(){if(!window._outs){return;}window._outs.forEach(function(o,i){setTimeout(function(){dlFile(o);},i*PREFS.stagger);});}
+
+document.getElementById('btnX').addEventListener('click',doExtract);
+document.getElementById('btnDlAllSb').addEventListener('click',dlAll);
+document.getElementById('btnDlAll').addEventListener('click',dlAll);
+document.getElementById('btnZB').addEventListener('click',dlAll);
+
+document.querySelectorAll('.pbtn').forEach(function(btn) {
+  btn.addEventListener('click',function() {
+    var p=PRESETS[btn.dataset.p];if(!p){return;}
+    var en=new Set(p.en);
+    CATS.forEach(function(cat){CS[cat.id].on=en.has(cat.id);if(p.fm[cat.id]){CS[cat.id].fmts=new Set(p.fm[cat.id]);}else if(en.has(cat.id)){CS[cat.id].fmts=new Set([cat.sf[0]]);}});
+    if(entityMap){renderCats(entityMap);}
+  });
+});
+
+document.getElementById('btnR').addEventListener('click',function() {
+  entityMap=null;strippedText=null;baseFn='';
+  document.getElementById('fi').classList.remove('show');document.getElementById('dz').style.display='';document.getElementById('browseBtn').style.display='';
+  document.getElementById('empty').style.display='flex';document.getElementById('cats').innerHTML='';
+  document.getElementById('rw').classList.remove('show');document.getElementById('pw').classList.remove('show');document.getElementById('emsg').classList.remove('show');
+  document.getElementById('btnX').disabled=true;document.getElementById('btnDlAllSb').disabled=true;document.getElementById('btnDlAll').disabled=true;document.getElementById('btnZB').disabled=true;
+  document.getElementById('tmid').textContent='No file loaded';document.getElementById('fileInput').value='';
+  initCS();updStatus();updCB();updColHdrs();updCatHdr();
+});
+
+// ── PROPERTIES MODAL ──────────────────────────────────────────────────────────
+function openModal() {
+  document.getElementById('scl').value=PREFS.scale;
+  document.getElementById('spct').textContent=PREFS.scale+'%';
+  document.getElementById('optCounts').checked=PREFS.counts;
+  document.getElementById('optExpand').checked=PREFS.expand;
+  document.getElementById('optExt').value=PREFS.ext;
+  document.getElementById('optDefFmt').value=PREFS.defFmt;
+  document.getElementById('optStagger').value=String(PREFS.stagger);
+  document.getElementById('optStrip').checked=PREFS.strip;
+  document.getElementById('optSelAll').checked=PREFS.selAll;
+  document.getElementById('modalOverlay').classList.add('show');
+}
+function closeModal(){document.getElementById('modalOverlay').classList.remove('show');}
+
+document.getElementById('scl').addEventListener('input',function() {
+  var v=parseInt(this.value);document.getElementById('spct').textContent=v+'%';
+  applyScale(v);
+});
+
+document.getElementById('btnProps').addEventListener('click',openModal);
+document.getElementById('modalClose').addEventListener('click',closeModal);
+document.getElementById('modalCancel').addEventListener('click',closeModal);
+document.getElementById('modalOverlay').addEventListener('click',function(e){if(e.target===this){closeModal();}});
+
+document.getElementById('modalOK').addEventListener('click',function() {
+  PREFS.scale   = parseInt(document.getElementById('scl').value);
+  PREFS.counts  = document.getElementById('optCounts').checked;
+  PREFS.expand  = document.getElementById('optExpand').checked;
+  PREFS.ext     = document.getElementById('optExt').value;
+  PREFS.defFmt  = document.getElementById('optDefFmt').value;
+  PREFS.stagger = parseInt(document.getElementById('optStagger').value);
+  PREFS.strip   = document.getElementById('optStrip').checked;
+  PREFS.selAll  = document.getElementById('optSelAll').checked;
+  applyScale(PREFS.scale);
+  if(entityMap){renderCats(entityMap);}
+  closeModal();
+});
+
+// ── FILE LOADING ──────────────────────────────────────────────────────────────
+var fileInput=document.getElementById('fileInput');
+var dropZone=document.getElementById('dz');
+
+document.getElementById('browseBtn').addEventListener('click',function(){fileInput.click();});
+fileInput.addEventListener('change',function(){if(fileInput.files&&fileInput.files[0]){processFile(fileInput.files[0]);fileInput.value='';}});
+dropZone.addEventListener('dragenter',function(e){e.preventDefault();dropZone.classList.add('over');});
+dropZone.addEventListener('dragover', function(e){e.preventDefault();dropZone.classList.add('over');});
+dropZone.addEventListener('dragleave',function(e){if(!dropZone.contains(e.relatedTarget)){dropZone.classList.remove('over');}});
+dropZone.addEventListener('drop',function(e){e.preventDefault();dropZone.classList.remove('over');var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f){processFile(f);}});
+</script>
+</body>
+</html>
